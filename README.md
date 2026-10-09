@@ -1,28 +1,32 @@
-# Web mockup
+# Procurement Insights (live)
 
-`index.html` is the Procurement Insights mockup. Served with its API it shows the latest 100 awarded reverse auctions from Neon; opened anywhere else (a gist, a local file) it shows its 20 built-in samples.
+A single page (`index.html`) and four Vercel functions that read the Neon database on the server. Every list is loaded one page at a time, so the page can show all of the data, not just a sample.
 
-`api/bids.js` is a Vercel function that reads Neon on the server. The database address is a server setting and never reaches the browser.
+| Address | What it returns |
+|---|---|
+| `/api/bids?q=&ministry=&limit=50&offset=0` | One page of tenders (a bid with its reverse auction, or a bid on its own), newest first, with the total and the ministry list for the filter. |
+| `/api/bid?id=<bid number>` | One tender with its details and every row of both evaluation tables. |
+| `/api/companies?q=&limit=50&offset=0` | One page of sellers, grouped by cleaned name, with bids placed, technically qualified, ranked L1 and L1 value. |
+| `/api/company?key=<name>` | One company: totals, buyers, competitors met most often and its full bid history. |
+
+The page's addresses can be bookmarked and shared: `#/bids?page=3&size=100`, `#/bid/GEM%2F2026%2FB%2F7990213`, `#/companies?q=enterprises`, `#/company/<name>`.
 
 ## Deploy on Vercel
 
-1. In the Neon SQL editor run `readonly-role.sql` (pick a password). Build the connection string for the `gem_web` user: copy your project's connection string and change the user and password.
-2. In Vercel: **Add New > Project**, import this repository, set **Root Directory** to `web`, **Framework Preset** to **Other**.
-3. Add the environment variable `DATABASE_URL` with the `gem_web` connection string, for Production and Preview.
-4. Deploy, then open `https://<your-project>.vercel.app/api/bids?limit=3`. It should return JSON.
+This folder is its own repository, so the project's **Root Directory stays blank** and the Framework Preset is **Other**.
 
-Or from a terminal: `cd web && npx vercel` (asks you to log in), then `npx vercel env add DATABASE_URL` and `npx vercel --prod`.
+1. Add the environment variable `DATABASE_URL` (Settings > Environment Variables) with the Neon connection string.
+2. Push to GitHub. Vercel deploys on every push. After changing the variable, redeploy once.
+3. Check `https://<your-project>.vercel.app/api/bids?limit=3`: it should return JSON with a `total`.
 
-`vercel.json` runs the function in Singapore (`sin1`), next to the Neon database, so each query is fast.
+`vercel.json` runs the functions in Singapore (`sin1`), next to the Neon database.
 
-## Run it locally
-
-`npx vercel dev` in this folder (needs the same login and `DATABASE_URL` in `web/.env.local`).
+`readonly-role.sql` is optional: it makes a database user that can only read the two tables the page needs. Use its connection string in `DATABASE_URL` if the database ever holds anything you care about.
 
 ## Things to know
 
-- GitHub Pages and a gist cannot run `api/bids.js`. They show the static sample only.
-- Repeat visits are served from Vercel's cache for 60 seconds, so a busy page does not load the database every time.
-- The buyer's name, address and contact are left out of the response, as the page says.
-- Each response carries at most 300 bids (`?limit=`), and each evaluation table at most 100 sellers.
-- The company totals are worked out in the browser from the bids it received. That is right for a mockup with a few hundred bids and not for millions: a real version needs those totals from SQL.
+- Answers are cached by Vercel for 60 seconds, so a busy page does not load the database each time.
+- The company totals, the competitor counts and the ministry list are worked out in SQL from the stored pages on each request (about 0.3 to 1.5 seconds with 1,800 tenders). That is fine up to roughly 10,000 tenders. Beyond that the company queries approach Vercel's 10 second limit and should read the pipeline's `company_*` tables, which the nightly build fills.
+- The buyer's name, address and contact are left out of every response.
+- The page has no built-in sample data any more: it needs the API. The old static mockup is `ui-mockup.html` in the main project's `out/` folder.
+- GitHub Pages cannot run the functions. Use Vercel (or Netlify or Cloudflare).
